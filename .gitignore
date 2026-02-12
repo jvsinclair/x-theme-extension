@@ -1,0 +1,26 @@
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore node_modules if any build process is added later
+node_modules/
+
+# Ignore packed extension files
+*.zip
+*.crx
+*.pem
+
+# Ignore temporary files
+*.tmp
+*.log
+
+# Keep icons directory but ignore working files
+icons/*.psd
+icons/*.ai
+icons/*.sketch

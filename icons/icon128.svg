@@ -1,0 +1,20 @@
+<!-- SVG Icon 128x128 - Can be converted to PNG using online tools -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background -->
+  <rect width="128" height="128" fill="#15202B" rx="24"/>
+  
+  <!-- Main paint palette shape -->
+  <ellipse cx="64" cy="70" rx="48" ry="42" fill="#1D9BF0" opacity="0.2"/>
+  
+  <!-- Color dots representing the palette -->
+  <circle cx="40" cy="50" r="12" fill="#1D9BF0"/>
+  <circle cx="70" cy="45" r="12" fill="#FFD400"/>
+  <circle cx="88" cy="65" r="12" fill="#F91880"/>
+  <circle cx="72" cy="85" r="12" fill="#7856FF"/>
+  <circle cx="45" cy="82" r="12" fill="#00BA7C"/>
+  
+  <!-- Highlight overlay for depth -->
+  <circle cx="40" cy="50" r="5" fill="#FFFFFF" opacity="0.3"/>
+  <circle cx="70" cy="45" r="5" fill="#FFFFFF" opacity="0.3"/>
+  <circle cx="88" cy="65" r="5" fill="#FFFFFF" opacity="0.3"/>
+</svg>
