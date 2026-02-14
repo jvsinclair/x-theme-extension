@@ -86,25 +86,33 @@
         return document.documentElement.getAttribute('data-theme') || 'dark';
     }
 
-    // Apply custom background lightness using CSS overrides (safe approach)
-    function applyBackgroundColor(lightnessValue) {
-        console.log('[X Theme Customizer] applyBackgroundColor called with:', lightnessValue);
-
+    // Apply custom background color and lightness using CSS overrides (safe approach)
+    function applyBackgroundColor(lightnessValue, customColor = null) {
         const currentTheme = getCurrentTheme();
-        console.log('[X Theme Customizer] Current theme:', currentTheme);
 
-        // Get the base hue/saturation for each theme
-        const themeDefaults = {
-            dark: { h: 0, s: 0 },      // Pure black/white
-            light: { h: 0, s: 0 },     // Pure black/white
-            dim: { h: 210, s: 34 }     // Blue-ish
-        };
+        let targetRGB;
+        let hslString;
 
-        const baseColor = themeDefaults[currentTheme] || themeDefaults.dark;
-        const targetRGB = hslToRgb(baseColor.h, baseColor.s, lightnessValue);
+        if (customColor) {
+            // Use custom color from color picker
+            const rgb = hexToRgb(customColor);
+            // Override lightness while preserving the custom color's hue/saturation
+            const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+            targetRGB = hslToRgb(hsl.h, hsl.s, lightnessValue);
+            hslString = `${hsl.h} ${hsl.s}% ${lightnessValue}%`;
+        } else {
+            // Get the base hue/saturation for each theme
+            const themeDefaults = {
+                dark: { h: 0, s: 0 },      // Pure black/white
+                light: { h: 0, s: 0 },     // Pure black/white
+                dim: { h: 210, s: 34 }     // Blue-ish
+            };
+            const baseColor = themeDefaults[currentTheme] || themeDefaults.dark;
+            targetRGB = hslToRgb(baseColor.h, baseColor.s, lightnessValue);
+            hslString = `${baseColor.h} ${baseColor.s}% ${lightnessValue}%`;
+        }
+
         const rgbString = `rgb(${targetRGB.r}, ${targetRGB.g}, ${targetRGB.b})`;
-
-        console.log('[X Theme Customizer] Target RGB:', rgbString);
 
         // Create/update our override stylesheet (safer than modifying React's stylesheet)
         let styleEl = document.getElementById('x-theme-customizer-styles');
@@ -112,12 +120,7 @@
             styleEl = document.createElement('style');
             styleEl.id = 'x-theme-customizer-styles';
             document.head.appendChild(styleEl);
-            console.log('[X Theme Customizer] Created new style element');
-        } else {
-            console.log('[X Theme Customizer] Updating existing style element');
         }
-
-        const hslString = `${baseColor.h} ${baseColor.s}% ${lightnessValue}%`;
 
         // Override body and .r-kemksi backgrounds with !important
         const cssContent = `
@@ -138,8 +141,7 @@
     `;
 
         styleEl.textContent = cssContent;
-        console.log('[X Theme Customizer] CSS applied:', cssContent);
-        console.log('[X Theme Customizer] Style element parent:', styleEl.parentNode);
+        console.log(`[X Theme Customizer] Applied theme: ${rgbString}`);
     }
 
 
@@ -174,6 +176,47 @@
         };
     }
 
+    // Helper: Convert hex to RGB
+    function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+    }
+
+    // Helper: Convert RGB to HSL
+    function rgbToHsl(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+
+        if (max === min) {
+            h = s = 0; // achromatic
+        } else {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+            switch (max) {
+                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                case g: h = ((b - r) / d + 2) / 6; break;
+                case b: h = ((r - g) / d + 4) / 6; break;
+            }
+        }
+
+        return {
+            h: Math.round(h * 360),
+            s: Math.round(s * 100),
+            l: Math.round(l * 100)
+        };
+    }
+
+
     // Remove custom styles
     function removeCustomStyles() {
         const styleEl = document.getElementById('x-theme-customizer-styles');
@@ -184,13 +227,11 @@
 
     // Listen for storage changes to update theme live (preserves scroll position!)
     chrome.storage.onChanged.addListener((changes, areaName) => {
-        console.log('[X Theme Customizer] Storage changed:', changes, areaName);
         if (areaName === 'local' && changes.xThemeCustomizer) {
             const newSettings = changes.xThemeCustomizer.newValue;
-            console.log('[X Theme Customizer] New settings:', newSettings);
             if (newSettings && newSettings.enabled) {
-                // Just pass the lightness value - color is ignored for now
-                applyBackgroundColor(newSettings.lightnessValue);
+                // Pass both lightness and custom color
+                applyBackgroundColor(newSettings.lightnessValue, newSettings.customBackgroundColor);
             } else {
                 removeCustomStyles();
             }
@@ -357,8 +398,8 @@
             return;
         }
 
-        // Only lightness adjustment for now - color picker disabled
-        applyBackgroundColor(settings.lightnessValue);
+        // Pass both lightness and custom color
+        applyBackgroundColor(settings.lightnessValue, settings.customBackgroundColor);
     }
 
     // Load saved settings
@@ -385,8 +426,6 @@
 
     // Initialize
     function init() {
-        console.log('[X Theme Customizer] Init called on:', window.location.href);
-
         // Check if we're on the settings page
         if (window.location.href.includes('/settings/display')) {
             injectControls();
@@ -394,7 +433,6 @@
 
         // Also apply saved settings on any X.com page
         storage.get().then(settings => {
-            console.log('[X Theme Customizer] Loaded settings:', settings);
             if (settings.enabled) {
                 applySettings(settings);
             }

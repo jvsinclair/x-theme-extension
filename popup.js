@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lightnessSlider = document.getElementById('lightnessSlider');
     const lightnessValue = document.getElementById('lightnessValue');
     const colorPicker = document.getElementById('colorPicker');
-    const colorPreview = document.getElementById('colorPreview');
     const resetButton = document.getElementById('resetButton');
 
     // Color conversion utilities
@@ -88,7 +87,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (colorPicker) {
             colorPicker.value = settings.customBackgroundColor;
-            colorPreview.style.background = settings.customBackgroundColor;
         }
     }
 
@@ -129,10 +127,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         debouncedSave();
     });
 
-    // Color picker
     colorPicker.addEventListener('input', (e) => {
         const color = e.target.value;
-        colorPreview.style.background = color;
+        colorPicker.style.background = color;
 
         settings.customBackgroundColor = color;
         settings.lightnessValue = colorUtils.hexToHSL(color).l;
