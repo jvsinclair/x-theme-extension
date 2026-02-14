@@ -1,13 +1,9 @@
 // X Theme Customizer - Content Script
 // Injects custom background color controls into X.com display settings
+// AND applies background colors to all X.com pages
 
 (function () {
     'use strict';
-
-    // Only run on the display settings page
-    if (!window.location.href.includes('/settings/display')) {
-        return;
-    }
 
     console.log('[X Theme Customizer] Extension loaded');
 
@@ -90,45 +86,92 @@
         return document.documentElement.getAttribute('data-theme') || 'dark';
     }
 
-    // Apply custom background color
-    function applyBackgroundColor(hslString) {
+    // Apply custom background lightness using CSS overrides (safe approach)
+    function applyBackgroundColor(lightnessValue) {
+        console.log('[X Theme Customizer] applyBackgroundColor called with:', lightnessValue);
+
+        const currentTheme = getCurrentTheme();
+        console.log('[X Theme Customizer] Current theme:', currentTheme);
+
+        // Get the base hue/saturation for each theme
+        const themeDefaults = {
+            dark: { h: 0, s: 0 },      // Pure black/white
+            light: { h: 0, s: 0 },     // Pure black/white
+            dim: { h: 210, s: 34 }     // Blue-ish
+        };
+
+        const baseColor = themeDefaults[currentTheme] || themeDefaults.dark;
+        const targetRGB = hslToRgb(baseColor.h, baseColor.s, lightnessValue);
+        const rgbString = `rgb(${targetRGB.r}, ${targetRGB.g}, ${targetRGB.b})`;
+
+        console.log('[X Theme Customizer] Target RGB:', rgbString);
+
+        // Create/update our override stylesheet (safer than modifying React's stylesheet)
         let styleEl = document.getElementById('x-theme-customizer-styles');
         if (!styleEl) {
             styleEl = document.createElement('style');
             styleEl.id = 'x-theme-customizer-styles';
             document.head.appendChild(styleEl);
+            console.log('[X Theme Customizer] Created new style element');
+        } else {
+            console.log('[X Theme Customizer] Updating existing style element');
         }
 
-        // Target the main background CSS variables and key X.com classes
-        styleEl.textContent = `
-      :root, :root[data-theme="dark"], :root[data-theme="light"], :root[data-theme="dim"] {
+        const hslString = `${baseColor.h} ${baseColor.s}% ${lightnessValue}%`;
+
+        // Override body and .r-kemksi backgrounds with !important
+        const cssContent = `
+      /* CSS Variables */
+      :root[data-theme="${currentTheme}"] {
         --color-background: ${hslString} !important;
         --background: ${hslString} !important;
       }
       
-      /* Main body background */
+      /* Direct overrides */
       body {
-        background-color: hsl(${hslString}) !important;
+        background-color: ${rgbString} !important;
       }
       
-      /* Timeline and main feed background - r-kemksi is the key class */
       .r-kemksi {
-        background-color: hsl(${hslString}) !important;
-      }
-      
-      /* Header background */
-      .r-5zmot {
-        background-color: hsl(${hslString}) !important;
-      }
-      
-      /* Other common background classes */
-      .r-14lw9ot,
-      .r-1niwhzg,
-      .r-1jgb5lz,
-      .r-13qz1uu {
-        background-color: hsl(${hslString}) !important;
+        background-color: ${rgbString} !important;
       }
     `;
+
+        styleEl.textContent = cssContent;
+        console.log('[X Theme Customizer] CSS applied:', cssContent);
+        console.log('[X Theme Customizer] Style element parent:', styleEl.parentNode);
+    }
+
+
+    // Helper: Convert HSL to RGB object
+    function hslToRgb(h, s, l) {
+        s /= 100;
+        l /= 100;
+
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = l - c / 2;
+
+        let r = 0, g = 0, b = 0;
+        if (h >= 0 && h < 60) {
+            r = c; g = x; b = 0;
+        } else if (h >= 60 && h < 120) {
+            r = x; g = c; b = 0;
+        } else if (h >= 120 && h < 180) {
+            r = 0; g = c; b = x;
+        } else if (h >= 180 && h < 240) {
+            r = 0; g = x; b = c;
+        } else if (h >= 240 && h < 300) {
+            r = x; g = 0; b = c;
+        } else if (h >= 300 && h < 360) {
+            r = c; g = 0; b = x;
+        }
+
+        return {
+            r: Math.round((r + m) * 255),
+            g: Math.round((g + m) * 255),
+            b: Math.round((b + m) * 255)
+        };
     }
 
     // Remove custom styles
@@ -139,16 +182,15 @@
         }
     }
 
-    // Listen for messages from popup for live updates
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.action === 'updateTheme') {
-            const settings = message.settings;
-            if (settings.enabled) {
-                const hslString = colorUtils.adjustLightness(
-                    settings.customBackgroundColor,
-                    settings.lightnessValue
-                );
-                applyBackgroundColor(hslString);
+    // Listen for storage changes to update theme live (preserves scroll position!)
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        console.log('[X Theme Customizer] Storage changed:', changes, areaName);
+        if (areaName === 'local' && changes.xThemeCustomizer) {
+            const newSettings = changes.xThemeCustomizer.newValue;
+            console.log('[X Theme Customizer] New settings:', newSettings);
+            if (newSettings && newSettings.enabled) {
+                // Just pass the lightness value - color is ignored for now
+                applyBackgroundColor(newSettings.lightnessValue);
             } else {
                 removeCustomStyles();
             }
@@ -315,11 +357,8 @@
             return;
         }
 
-        const hslString = colorUtils.adjustLightness(
-            settings.customBackgroundColor,
-            settings.lightnessValue
-        );
-        applyBackgroundColor(hslString);
+        // Only lightness adjustment for now - color picker disabled
+        applyBackgroundColor(settings.lightnessValue);
     }
 
     // Load saved settings
@@ -346,6 +385,8 @@
 
     // Initialize
     function init() {
+        console.log('[X Theme Customizer] Init called on:', window.location.href);
+
         // Check if we're on the settings page
         if (window.location.href.includes('/settings/display')) {
             injectControls();
@@ -353,6 +394,7 @@
 
         // Also apply saved settings on any X.com page
         storage.get().then(settings => {
+            console.log('[X Theme Customizer] Loaded settings:', settings);
             if (settings.enabled) {
                 applySettings(settings);
             }

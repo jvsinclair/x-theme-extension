@@ -69,15 +69,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Reload X.com tabs
-    function reloadXTabs() {
-        chrome.tabs.query({ url: ['https://x.com/*', 'https://twitter.com/*'] }, tabs => {
-            tabs.forEach(tab => {
-                chrome.tabs.reload(tab.id);
-            });
-        });
-    }
-
     // Update UI
     function updateUI(settings) {
         extensionToggle.checked = settings.enabled;
@@ -105,7 +96,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = await loadSettings();
     updateUI(settings);
 
-    // Debounce helper to prevent too many updates
+    // Toggle extension
+    extensionToggle.addEventListener('change', async (e) => {
+        settings.enabled = e.target.checked;
+        settings.timestamp = Date.now();
+        await saveSettings(settings);
+        updateUI(settings);
+        // No reload - storage listener will update automatically
+    });
+
+    // Debounce helper
     function debounce(fn, delay) {
         let timeoutId;
         return function (...args) {
@@ -114,47 +114,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // Update theme without reload
-    function updateThemeLive() {
-        if (settings.enabled) {
-            chrome.tabs.query({ url: ['https://x.com/*', 'https://twitter.com/*'] }, tabs => {
-                tabs.forEach(tab => {
-                    chrome.tabs.sendMessage(tab.id, {
-                        action: 'updateTheme',
-                        settings: settings
-                    }).catch(() => { }); // Ignore errors if content script not ready
-                });
-            });
-        }
-    }
+    // Debounced save - storage listener will auto-update theme
+    const debouncedSave = debounce(() => saveSettings(settings), 150);
 
-    // Debounced version - waits 150ms after last change
-    const debouncedUpdateTheme = debounce(updateThemeLive, 150);
-
-    // Toggle extension
-    extensionToggle.addEventListener('change', async (e) => {
-        settings.enabled = e.target.checked;
-        settings.timestamp = Date.now();
-        await saveSettings(settings);
-        updateUI(settings);
-        reloadXTabs();
-    });
-
-    // Lightness slider - update UI immediately, but debounce the theme application
-    lightnessSlider.addEventListener('input', async (e) => {
+    // Lightness slider
+    lightnessSlider.addEventListener('input', (e) => {
         const lightness = parseInt(e.target.value);
         lightnessValue.textContent = lightness;
 
         settings.lightnessValue = lightness;
         settings.timestamp = Date.now();
-        await saveSettings(settings);
 
-        // Debounced update to prevent rate limiting
-        debouncedUpdateTheme();
+        // Debounced save - storage listener will update automatically
+        debouncedSave();
     });
 
-    // Color picker - debounced as well
-    colorPicker.addEventListener('input', async (e) => {
+    // Color picker
+    colorPicker.addEventListener('input', (e) => {
         const color = e.target.value;
         colorPreview.style.background = color;
 
@@ -163,13 +139,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         lightnessSlider.value = settings.lightnessValue;
         lightnessValue.textContent = settings.lightnessValue;
         settings.timestamp = Date.now();
-        await saveSettings(settings);
 
-        // Debounced update to prevent rate limiting
-        debouncedUpdateTheme();
+        // Debounced save - storage listener will update automatically
+        debouncedSave();
     });
 
-    // Reset button - no debounce needed for single click
+    // Reset button
     resetButton.addEventListener('click', async () => {
         const theme = settings.appliedTheme || 'dark';
         const defaultColor = theme === 'light' ? '#FFFFFF' : (theme === 'dim' ? '#15202B' : '#000000');
@@ -184,9 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         settings.lightnessValue = lightness;
         settings.timestamp = Date.now();
         await saveSettings(settings);
-
-        // Immediate update for reset (no debounce)
-        updateThemeLive();
+        // Storage listener handles the update
     });
 
     // Open settings page
