@@ -122,7 +122,7 @@
             document.head.appendChild(styleEl);
         }
 
-        // Override body and .r-kemksi backgrounds with !important
+        // Override body and .r-kemksi / r-5zmot (Dark Theme) and .r-14lw9ot / r-6026j (light theme) backgrounds with !important
         const cssContent = `
       /* CSS Variables */
       :root[data-theme="${currentTheme}"] {
@@ -138,6 +138,19 @@
       .r-kemksi {
         background-color: ${rgbString} !important;
       }
+    
+      .r-5zmot {
+        background-color: ${rgbString} !important;
+      }
+
+      .r-14lw9ot {
+        background-color: ${rgbString} !important;
+      }
+
+      .r-6026j {
+        background-color: ${rgbString} !important;
+      }
+
     `;
 
         styleEl.textContent = cssContent;
